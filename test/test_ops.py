@@ -1,8 +1,8 @@
 import itertools
+import math
 import sys
 
 import pytest
-import math
 import torch
 from torch.testing._internal.common_utils import (
     TestCase,

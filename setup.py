@@ -273,6 +273,12 @@ def get_extensions():
     this_dir = os.path.dirname(os.path.curdir)
     extensions_dir = os.path.join(this_dir, "torchao", "csrc")
     sources = list(glob.glob(os.path.join(extensions_dir, "**/*.cpp"), recursive=True))
+    if IS_WINDOWS:
+        # Remove csrc/cpu/*.cpp on Windows due to the link issue: unresolved external symbol PyInit__C
+        cpp_sources = list(
+            glob.glob(os.path.join(extensions_dir, "cpu/*.cpp"), recursive=True)
+        )
+        sources = [s for s in sources if s not in cpp_sources]
 
     extensions_cuda_dir = os.path.join(extensions_dir, "cuda")
     cuda_sources = list(

@@ -13,12 +13,14 @@ from torch._inductor.pattern_matcher import (
     Match,
     PatternMatcherPass,
 )
+from .int8_sdpa_lowering import Int8SDPA
 
 __all__ = [
     "_int8_sdpa_init",
 ]
 
 make_fallback(torch.ops.torchao.scaled_dot_product_int8.default)
+# make_fallback(torch._scaled_dot_product_int8)
 
 aten = torch.ops.aten
 patterns = PatternMatcherPass()
@@ -48,6 +50,7 @@ def _register_int8_sdpa_pattern(pattern):
         extra_check=_is_valid_int8_sdpa_pattern(),
     )
     def int8_sdpa(match: Match, *args, **kwargs):
+        print("***hit pattern int8_sdpa***")
         query = kwargs["query"]
         key = kwargs["key"]
         value = kwargs["value"]
@@ -69,14 +72,34 @@ def _register_int8_sdpa_pattern(pattern):
         trans_query = L[aten.permute.default](query, [0, 2, 1, 3])
         trans_key = L[aten.permute.default](key, [0, 2, 1, 3])
         trans_value = L[aten.permute.default](value, [0, 2, 1, 3])
-        output = L[torch.ops.torchao.scaled_dot_product_int8.default](
+        # output = L[torch.ops.torchao.scaled_dot_product_int8.default](
+        #     trans_query,
+        #     trans_key,
+        #     trans_value,
+        #     attn_mask,
+        #     0.0,  # dropout
+        #     False,  # is_causal
+        #     1.0 / inv_scale,  # scale
+        #     q_zp,
+        #     q_scale,
+        #     k_zp,
+        #     k_scale,
+        #     v_zp,
+        #     v_scale,
+        #     a_zp,
+        #     a_scale,
+        #     o_zp,
+        #     o_scale,
+        # )
+
+        output = L[torch._scaled_dot_product_int8](
             trans_query,
             trans_key,
             trans_value,
             attn_mask,
+            1.0 / inv_scale,  # scale
             0.0,  # dropout
             False,  # is_causal
-            1.0 / inv_scale,  # scale
             q_zp,
             q_scale,
             k_zp,
@@ -89,9 +112,10 @@ def _register_int8_sdpa_pattern(pattern):
             o_scale,
         )
         trans_output = L[aten.permute.default](output, [0, 2, 1, 3])
-        return L[aten.clone.default](
-            trans_output, memory_format=torch.contiguous_format
-        )
+        # return L[aten.clone.default](
+        #     trans_output, memory_format=torch.contiguous_format
+        # )
+        return trans_output
 
     return int8_sdpa
 

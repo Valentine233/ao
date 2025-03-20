@@ -54,7 +54,7 @@ class SelfAttnLikeModule(torch.nn.Module):
         k = self.transpose_for_scores(k)
         v = self.transpose_for_scores(v)
         scores = torch.matmul(q, k.transpose(-1, -2)) / (self.input_dim**0.5)
-        if self.has_mask and mask.dtype != scores.dtype:
+        if self.has_mask:
             scores = scores + mask
         attention = self.softmax(scores)
         attention = self.dropout(attention)
@@ -121,7 +121,7 @@ class TestSDPAPatternRewriterTemplate(TestCase):
             if contains:
                 # many of the patterns get re-expanded in dispatcher
                 self.assertIn(
-                    "torchao.scaled_dot_product_int8",
+                    "_scaled_dot_product_int8",
                     source_code,
                 )
 

@@ -19,7 +19,7 @@ __all__ = [
     "_int8_sdpa_init",
 ]
 
-make_fallback(torch.ops.torchao.scaled_dot_product_int8.default)
+# make_fallback(torch.ops.torchao.scaled_dot_product_int8.default)
 # make_fallback(torch._scaled_dot_product_int8)
 
 aten = torch.ops.aten
@@ -92,7 +92,8 @@ def _register_int8_sdpa_pattern(pattern):
         #     o_scale,
         # )
 
-        output = L[torch._scaled_dot_product_int8](
+        output = L[aten._scaled_dot_product_int8.default](
+        # output = L[torch._scaled_dot_product_int8](
             trans_query,
             trans_key,
             trans_value,

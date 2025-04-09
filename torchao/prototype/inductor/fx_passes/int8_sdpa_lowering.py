@@ -6,7 +6,7 @@ from torch._inductor.ir import FixedLayout, get_fill_order, TensorBox, ExternKer
 from torch._inductor.lowering import expand, register_lowering, make_fallback
 from torch._inductor.kernel.flex_attention import construct_strides, maybe_realize
 # from torchao.ops import scaled_dot_product_int8
-from torch import _scaled_dot_product_int8
+# from torch import _scaled_dot_product_int8
 
 class Int8SDPA(ExternKernelAlloc):
     def __init__(
@@ -20,7 +20,8 @@ class Int8SDPA(ExternKernelAlloc):
             inputs,
             constant_args,
             None,
-            op_overload=_scaled_dot_product_int8,
+            # op_overload=_scaled_dot_product_int8,
+            op_overload=torch.ops.aten._scaled_dot_product_int8.default,
             cpp_kernel_name="aoti_torch_cpu__scaled_dot_product_int8",
             # op_overload=torch.ops.torchao.scaled_dot_product_int8.default,
         )
@@ -120,7 +121,8 @@ class Int8SDPA(ExternKernelAlloc):
 
 def register_int8_sdpa():
     # @register_lowering(scaled_dot_product_int8, type_promotion_kind=None)
-    @register_lowering(_scaled_dot_product_int8, type_promotion_kind=None)
+    # @register_lowering(_scaled_dot_product_int8, type_promotion_kind=None)
+    @register_lowering(torch.ops.aten._scaled_dot_product_int8.default, type_promotion_kind=None)
     def int8_sdpa(
         query: TensorBox,
         key: TensorBox,

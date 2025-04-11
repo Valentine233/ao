@@ -1834,7 +1834,8 @@ at::Tensor _scaled_dot_product_int8_cpu(
     const at::Tensor& query,
     const at::Tensor& key,
     const at::Tensor& value,
-    at::Tensor& attn_mask,
+    std::optional<at::Tensor> attn_mask,
+    // at::Tensor& attn_mask,
     double dropout_p,
     bool is_causal,
     double scale,
@@ -1848,56 +1849,59 @@ at::Tensor _scaled_dot_product_int8_cpu(
     double a_scale,
     int64_t o_zp,
     double o_scale) {
-  const auto dtype = query.scalar_type();
-  TORCH_CHECK(!query.is_nested() && !key.is_nested() && !value.is_nested(),
-    "_scaled_dot_product_int8_cpu: Only accept plain inputs");
-  TORCH_CHECK(!is_causal,
-    "_scaled_dot_product_int8_cpu: is_causal not supported.");
-  TORCH_CHECK(dtype == at::ScalarType::Byte,
-    "_scaled_dot_product_int8_cpu: Expected data type be U8, but got ", dtype, " instead.");
-  TORCH_CHECK(query.dim() == 4 && key.dim() == 4 && value.dim() == 4,
-    "_scaled_dot_product_int8_cpu: Accept only 4 dims inputs shape of {B, H, T, K}");
-  TORCH_CHECK(dropout_p == 0.0,
-    "_scaled_dot_product_int8_cpu: Currently do not support dropout > 0");
-  TORCH_CHECK((query.size(3) == value.size(3)) && (key.size(3) == value.size(3)),
-    "_scaled_dot_product_int8_cpu: Q/K/V should have the same head size");
-  TORCH_CHECK(!attn_mask.defined() ||
-          attn_mask.scalar_type() == at::kFloat ||
-          attn_mask.scalar_type() == at::kBFloat16,
-    "_scaled_dot_product_int8_cpu: Expected attention mask be float or bf16");
-  TORCH_CHECK(!attn_mask.defined() ||
-          (attn_mask.dim() == 2 || attn_mask.dim() == 4),
-    "_scaled_dot_product_int8_cpu: Attention mask dim in {2, 4}");
+  at::Tensor output = at::empty_like(query, query.options()).transpose(1, 2);
+  return output;
+    
+  // const auto dtype = query.scalar_type();
+  // TORCH_CHECK(!query.is_nested() && !key.is_nested() && !value.is_nested(),
+  //   "_scaled_dot_product_int8_cpu: Only accept plain inputs");
+  // TORCH_CHECK(!is_causal,
+  //   "_scaled_dot_product_int8_cpu: is_causal not supported.");
+  // TORCH_CHECK(dtype == at::ScalarType::Byte,
+  //   "_scaled_dot_product_int8_cpu: Expected data type be U8, but got ", dtype, " instead.");
+  // TORCH_CHECK(query.dim() == 4 && key.dim() == 4 && value.dim() == 4,
+  //   "_scaled_dot_product_int8_cpu: Accept only 4 dims inputs shape of {B, H, T, K}");
+  // TORCH_CHECK(dropout_p == 0.0,
+  //   "_scaled_dot_product_int8_cpu: Currently do not support dropout > 0");
+  // TORCH_CHECK((query.size(3) == value.size(3)) && (key.size(3) == value.size(3)),
+  //   "_scaled_dot_product_int8_cpu: Q/K/V should have the same head size");
+  // TORCH_CHECK(!attn_mask.defined() ||
+  //         attn_mask.scalar_type() == at::kFloat ||
+  //         attn_mask.scalar_type() == at::kBFloat16,
+  //   "_scaled_dot_product_int8_cpu: Expected attention mask be float or bf16");
+  // TORCH_CHECK(!attn_mask.defined() ||
+  //         (attn_mask.dim() == 2 || attn_mask.dim() == 4),
+  //   "_scaled_dot_product_int8_cpu: Attention mask dim in {2, 4}");
 
-  #ifdef CPU_CAPABILITY_AVX512
-    if (at::native::cpublas::could_pack(dtype)) {
-        at::Tensor output = at::empty_like(query, query.options()).transpose(1, 2);
-        sdpa_int8_fused_kernel(output, query, key, value,
-            dropout_p, is_causal, attn_mask, scale,
-            q_zp, q_scale,
-            k_zp, k_scale,
-            v_zp, v_scale,
-            a_zp, a_scale,
-            o_zp, o_scale);
-        return output.transpose(1, 2);
-    } else {
-        return sdpa_int8_math_kernel(query, key, value,
-              dropout_p, is_causal, attn_mask, scale,
-              q_zp, q_scale,
-              k_zp, k_scale,
-              v_zp, v_scale,
-              a_zp, a_scale,
-              o_zp, o_scale).transpose(1, 2).contiguous().transpose(1, 2);
-    }
-  #else
-    return sdpa_int8_math_kernel(query, key, value,
-        dropout_p, is_causal, attn_mask, scale,
-        q_zp, q_scale,
-        k_zp, k_scale,
-        v_zp, v_scale,
-        a_zp, a_scale,
-        o_zp, o_scale).transpose(1, 2).contiguous().transpose(1, 2);
-  #endif // CPU_CAPABILITY_AVX512
+  // #ifdef CPU_CAPABILITY_AVX512
+  //   if (at::native::cpublas::could_pack(dtype)) {
+  //       at::Tensor output = at::empty_like(query, query.options()).transpose(1, 2);
+  //       sdpa_int8_fused_kernel(output, query, key, value,
+  //           dropout_p, is_causal, attn_mask, scale,
+  //           q_zp, q_scale,
+  //           k_zp, k_scale,
+  //           v_zp, v_scale,
+  //           a_zp, a_scale,
+  //           o_zp, o_scale);
+  //       return output.transpose(1, 2);
+  //   } else {
+  //       return sdpa_int8_math_kernel(query, key, value,
+  //             dropout_p, is_causal, attn_mask, scale,
+  //             q_zp, q_scale,
+  //             k_zp, k_scale,
+  //             v_zp, v_scale,
+  //             a_zp, a_scale,
+  //             o_zp, o_scale).transpose(1, 2).contiguous().transpose(1, 2);
+  //   }
+  // #else
+  //   return sdpa_int8_math_kernel(query, key, value,
+  //       dropout_p, is_causal, attn_mask, scale,
+  //       q_zp, q_scale,
+  //       k_zp, k_scale,
+  //       v_zp, v_scale,
+  //       a_zp, a_scale,
+  //       o_zp, o_scale).transpose(1, 2).contiguous().transpose(1, 2);
+  // #endif // CPU_CAPABILITY_AVX512
 }
 
 

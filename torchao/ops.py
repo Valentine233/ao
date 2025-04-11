@@ -28,7 +28,7 @@ lib.define(
     "rowwise_scaled_linear_cutlass_s8s4(Tensor input, Tensor input_scale, Tensor weight, Tensor weight_scale, Tensor bias) -> Tensor"
 )
 lib.define(
-    "scaled_dot_product_int8(Tensor query, Tensor key, Tensor value, Tensor attn_mask=None, float dropout_p=0.0, bool is_causal=False, float scale=0.0, int q_zp=0, float q_scale=1.0, int k_zp=0, float k_scale=1.0, int v_zp=0, float v_scale=1.0, int a_zp=0, float a_scale=1.0, int o_zp=0, float o_scale=1.0) -> Tensor"
+    "scaled_dot_product_int8(Tensor query, Tensor key, Tensor value, Tensor? attn_mask, float dropout_p=0.0, bool is_causal=False, float scale=0.0, int q_zp=0, float q_scale=1.0, int k_zp=0, float k_scale=1.0, int v_zp=0, float v_scale=1.0, int a_zp=0, float a_scale=1.0, int o_zp=0, float o_scale=1.0) -> Tensor"
 )
 lib.define("mx_fp8_bf16(Tensor a, Tensor b, Tensor a_scale, Tensor b_scale) -> Tensor")
 lib.define("mx_fp4_bf16(Tensor a, Tensor b, Tensor a_scale, Tensor b_scale) -> Tensor")
@@ -127,7 +127,7 @@ def scaled_dot_product_int8(
     query: Tensor,
     key: Tensor,
     value: Tensor,
-    attn_mask: Tensor = None,
+    attn_mask: Optional[Tensor],
     dropout_p: float = 0.0,
     is_causal: bool = False,
     scale: float = 0.0,
@@ -193,7 +193,7 @@ def _(
     query: Tensor,
     key: Tensor,
     value: Tensor,
-    attn_mask: Tensor = None,
+    attn_mask: Optional[Tensor],
     dropout_p: float = 0.0,
     is_causal: bool = False,
     scale: float = 0.0,

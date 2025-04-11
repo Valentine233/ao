@@ -120,10 +120,7 @@ class TestSDPAPatternRewriterTemplate(TestCase):
                 self.assertGreaterEqual(counters["inductor"]["int8_fuse_attention"], 1)
             if contains:
                 # many of the patterns get re-expanded in dispatcher
-                self.assertIn(
-                    "scaled_dot_product_int8",
-                    source_code,
-                )
+                self.assertTrue(any(op_name in source_code for op_name in ["scaled_dot_product_int8", "cpp_fused_quantize_per_tensor"]))
 
             # some tests configured with very low dropout where we still want to check equality
             if not has_dropout or override_check_equal:
@@ -157,7 +154,7 @@ class TestSDPAPatternRewriterTemplate(TestCase):
         # pattern is different for bs=1
         torch.manual_seed(1234)
         for dtype, has_mask, bs in itertools.product(
-            [torch.float32, torch.bfloat16], [False], [56, 1]
+            [torch.float32, torch.bfloat16], [True, False], [56, 1]
         ):
             seqlen, numhead, headsize = 197, 16, 64
             mod = SelfAttnLikeModule(

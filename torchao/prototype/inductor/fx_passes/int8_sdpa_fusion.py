@@ -14,7 +14,7 @@ from torch._inductor.pattern_matcher import (
     PatternMatcherPass,
 )
 # from .int8_sdpa_lowering import Int8SDPA
-from .int8_sdpa_lowering import register_int8_sdpa
+from ..int8_sdpa_lowering import register_int8_sdpa
 
 __all__ = [
     "_int8_sdpa_init",
@@ -68,7 +68,6 @@ def _register_int8_sdpa_pattern(pattern):
         o_scale = kwargs["o_scale"]
         counters["inductor"]["int8_fuse_attention"] += 1
         counters["inductor"]["int8_sdpa_nodes"] += len(match.nodes)
-        print("attn_mask: ", attn_mask)
 
         trans_query = L[aten.permute.default](query, [0, 2, 1, 3])
         trans_key = L[aten.permute.default](key, [0, 2, 1, 3])

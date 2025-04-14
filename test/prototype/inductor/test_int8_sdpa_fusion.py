@@ -143,6 +143,7 @@ class TestSDPAPatternRewriterTemplate(TestCase):
     )
     @pytest.mark.skipif(IS_WINDOWS, reason="int8 sdpa does not support windows yet")
     @config.patch({"freezing": True})
+    @config.patch({"cpp_wrapper": True})
     def _test_sdpa_int8_rewriter(self):
         import torch.ao.quantization.quantizer.x86_inductor_quantizer as xiq
         from torch.ao.quantization.quantize_pt2e import convert_pt2e, prepare_pt2e
@@ -166,8 +167,8 @@ class TestSDPAPatternRewriterTemplate(TestCase):
             inputs = (
                 torch.randn(
                     (bs, seqlen, headsize * numhead), device=self.device, dtype=dtype
-                ),
-                torch.randn((bs, 1, 1, seqlen), device=self.device)
+                ) * 10,
+                torch.randn((bs, 1, 1, seqlen), device=self.device) * 10
                 if has_mask
                 else None,
             )

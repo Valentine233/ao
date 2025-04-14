@@ -1023,7 +1023,6 @@ sdpa_int8_kernel_one_loop_impl(
               }
 
               // do dequant compensation, add mask, max reduce for softmax, and convert qk from s32 to fp32
-              int64_t rndkvBlockSize = kvBlockSize == kvSplitSize ? rndkvSplitSize : rndkvTail;
               accum_t* qk_block_data = qk_data + l * qSplitSize * rndkvSplitSize;
               if (has_attn_mask) {
                 mask_t* mask_data_offset = mask_data + i * mStrideB + j * mStrideH + m * mStrideM + (mStrideN == 0 ? 0 : n);
@@ -1034,7 +1033,7 @@ sdpa_int8_kernel_one_loop_impl(
                   k_sum_ptr + n, //sum_b_ptr
                   qBlockSize, //M
                   kvBlockSize, //N
-                  rndkvBlockSize, //ldi
+                  rndkvSplitSize, //ldi
                   mStrideM, //ldm
                   rndkvSplitSize,//kvBlockSize, //ldo
                   q_zp * k_zp * headSize, //zp_a*zp_b*k=beta
@@ -1049,7 +1048,7 @@ sdpa_int8_kernel_one_loop_impl(
                   k_sum_ptr + n, //sum_b_ptr
                   qBlockSize, //M
                   kvBlockSize, //N
-                  rndkvBlockSize, //ldi
+                  rndkvSplitSize, //ldi
                   rndkvSplitSize,//kvBlockSize, //ldo
                   q_zp * k_zp * headSize, //zp_a*zp_b*k=beta
                   q_scale * k_scale * scaling_factor, //scale_a*scale_b*scale_sdpa=alpha
@@ -1119,19 +1118,33 @@ sdpa_int8_kernel_one_loop_impl(
 
             // After the last gemm,
             // do dequant compensation, quant and convert from s32 to int8
-            _dequant_quant_fusion_kernel(
-              dst_s32_data, //in
-              a_sum_ptr, //sum_a_ptr
-              v_sum_ptr, //sum_b_ptr
-              qBlockSize, //M
-              headSize, //N
-              rndHeadSize, //ldi
-              oStrideM, //ldo
-              a_zp * v_zp * kvSize, //zp_a*zp_b*k=beta1
-              o_zp, //zp_c=beta2
-              a_scale * v_scale / o_scale, //scale_a*scale_b/scale_c=alpha
-              out_data + i * oStrideB + j * oStrideH + m * oStrideM //out
-            );
+            if (a_zp == 0) {
+              _dequant_quant_fusion_kernel(
+                dst_s32_data, //in
+                a_sum_ptr, //sum_a_ptr
+                qBlockSize, //M
+                headSize, //N
+                rndHeadSize, //ldi
+                oStrideM, //ldo
+                o_zp, //zp_c=beta2
+                a_scale * v_scale / o_scale, //scale_a*scale_b/scale_c=alpha
+                out_data + i * oStrideB + j * oStrideH + m * oStrideM //out
+              );
+            } else {
+              _dequant_quant_fusion_kernel(
+                dst_s32_data, //in
+                a_sum_ptr, //sum_a_ptr
+                v_sum_ptr, //sum_b_ptr
+                qBlockSize, //M
+                headSize, //N
+                rndHeadSize, //ldi
+                oStrideM, //ldo
+                a_zp * v_zp * kvSize, //zp_a*zp_b*k=beta1
+                o_zp, //zp_c=beta2
+                a_scale * v_scale / o_scale, //scale_a*scale_b/scale_c=alpha
+                out_data + i * oStrideB + j * oStrideH + m * oStrideM //out
+              );
+            }
           }
           // Move to the next query
           at::native::data_index_step(i, batchSize, j, num_head);

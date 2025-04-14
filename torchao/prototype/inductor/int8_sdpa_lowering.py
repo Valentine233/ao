@@ -9,11 +9,13 @@ from torch._inductor.utils import use_max_autotune
 from torch._inductor.select_algorithm import autotune_select_algorithm, ExternKernelChoice
 from .codegen.cpp_int8_sdpa_template import CppInt8SdpaTemplate
 
-aten_int8_sdpa = ExternKernelChoice(torch.ops.torchao.scaled_dot_product_int8, "torchao::scaled_dot_product_int8", has_out_variant=False)
+op_int8_sdpa = ExternKernelChoice(torch.ops.torchao.scaled_dot_product_int8.default,
+                                  "torchao::scaled_dot_product_int8",
+                                  has_out_variant=False,
+                                  use_fallback_kernel=True,
+                                  op_overload=torch.ops.torchao.scaled_dot_product_int8.default)
 
 def register_int8_sdpa():
-    # @register_lowering(scaled_dot_product_int8, type_promotion_kind=None)
-    # @register_lowering(_scaled_dot_product_int8, type_promotion_kind=None)
     @register_lowering(torch.ops.torchao.scaled_dot_product_int8.default, type_promotion_kind=None)
     def int8_sdpa(
         query: TensorBox,
@@ -34,7 +36,7 @@ def register_int8_sdpa():
         o_zp: Optional[int] = 0,
         o_scale: Optional[float] = 1.0,
     ) -> TensorBox:
-   
+
         choices: list[ChoiceCaller] = []
 
         (
@@ -76,27 +78,9 @@ def register_int8_sdpa():
         if attn_mask is not None:
             input_nodes.append(attn_mask)
 
-        # if use_max_autotune(): # TORCHINDUCTOR_MAX_AUTOTUNE=1
-        CppInt8SdpaTemplate.add_choices(
-            choices=choices,
-            input_nodes=input_nodes,
-            layout=layout,
-            scale=scale,
-            q_zp=q_zp,
-            q_scale=q_scale,
-            k_zp=k_zp,
-            k_scale=k_scale,
-            v_zp=v_zp,
-            v_scale=v_scale,
-            a_zp=a_zp,
-            a_scale=a_scale,
-            o_zp=o_zp,
-            o_scale=o_scale,
-        )
-            
-        # if len(choices) == 0:
-        choices.append(
-            aten_int8_sdpa.bind(
+        if torch._C._cpu._is_avx512_supported():
+            CppInt8SdpaTemplate.add_choices(
+                choices=choices,
                 input_nodes=input_nodes,
                 layout=layout,
                 scale=scale,
@@ -111,7 +95,25 @@ def register_int8_sdpa():
                 o_zp=o_zp,
                 o_scale=o_scale,
             )
-        )
+
+        if len(choices) == 0:
+            choices.append(
+                op_int8_sdpa.bind(
+                    input_nodes=input_nodes,
+                    layout=layout,
+                    scale=scale,
+                    q_zp=q_zp,
+                    q_scale=q_scale,
+                    k_zp=k_zp,
+                    k_scale=k_scale,
+                    v_zp=v_zp,
+                    v_scale=v_scale,
+                    a_zp=a_zp,
+                    a_scale=a_scale,
+                    o_zp=o_zp,
+                    o_scale=o_scale,
+                )
+            )
 
         inputs_for_autotuning = [
             query,
@@ -128,4 +130,3 @@ def register_int8_sdpa():
 
 
 register_int8_sdpa()
-# int8_sdpa_lowering._inductor_lowering_function = True  # type: ignore[attr-defined]

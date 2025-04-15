@@ -1,5 +1,6 @@
 # mypy: allow-untyped-defs
 import logging
+from sympy import sympify
 from typing import List, Optional
 
 import torch
@@ -1703,7 +1704,13 @@ class CppInt8SdpaTemplate(CppFlexAttentionTemplate):
         
         l2_cache_size = torch._C._cpu._L2_cache_size()
         attn_size = qSplitSize * kvSize * 4 * num_threads
-        use_one_parallel_loop = (batchSize * num_head > num_threads) and (attn_size > 1.5 * l2_cache_size)
+        use_one_parallel_loop = True
+        if all(sympify(val).is_number for val in [batchSize, num_head, num_threads, attn_size, l2_cache_size]):
+            # if not symbolic shape
+            use_one_parallel_loop = (
+                (batchSize * num_head > num_threads)
+                and (attn_size > 1.5 * l2_cache_size)
+            )
 
         options = dict(
             q_split_size=q_split_size,

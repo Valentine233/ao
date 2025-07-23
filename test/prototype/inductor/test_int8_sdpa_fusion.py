@@ -12,7 +12,7 @@ from torch.testing._internal.inductor_utils import HAS_CPU
 
 import torchao
 from torchao.prototype.inductor.fx_passes.int8_sdpa_fusion import (
-    _int8_sdpa_init,
+    _qsdpa_init,
     custom_pass,
 )
 from torchao.utils import TORCH_VERSION_AT_LEAST_2_7
@@ -193,7 +193,7 @@ class TestSDPAPatternRewriterTemplate(TestCase):
                 ),
                 config.patch(post_grad_custom_pre_pass=custom_pass),
             ):
-                _int8_sdpa_init()
+                _qsdpa_init()
                 quantizer = X86InductorQuantizer()
                 quantizer.set_global(xiq.get_default_x86_inductor_quantization_config())
                 quantizer.set_function_type_qconfig(

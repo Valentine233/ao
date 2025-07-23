@@ -136,7 +136,6 @@ def _generate_dequant_pattern(input_pattern, qtype, scale: str, zp: str=None):
             torch.ops.torchao.dequantize_affine_float8.default,
             input_pattern,
             KeywordArg(scale),
-            Arg(),
         )
 
 

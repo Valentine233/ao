@@ -118,7 +118,7 @@ def _register_qsdpa_pattern(pattern, custom_pass_dict):
     return qsdpa
 
 
-def _generate_dequant_pattern(input_pattern, qtype, scale: str, zp: str=None):
+def _generate_dequant_pattern(input_pattern, qtype, is_reduced_type, scale: str, zp: str=None):
     if qtype == torch.uint8:
         assert zp is not None, "Zero point must be provided for uint8 dequantization"
         return CallFunction(
@@ -132,11 +132,19 @@ def _generate_dequant_pattern(input_pattern, qtype, scale: str, zp: str=None):
         )
     else:
         assert zp is None, "Fp8 dequantization does not support zero point"
-        return CallFunction(
-            torch.ops.torchao.dequantize_affine_float8.default,
-            input_pattern,
-            KeywordArg(scale),
-        )
+        if is_reduced_type:
+            return CallFunction(
+                torch.ops.torchao.dequantize_affine_float8.default,
+                input_pattern,
+                KeywordArg(scale),
+                Arg(),
+            )
+        else:
+            return CallFunction(
+                torch.ops.torchao.dequantize_affine_float8.default,
+                input_pattern,
+                KeywordArg(scale),
+            )
 
 
 def _generate_quant_pattern(input_pattern, qtype, scale: str, zp: str=None):
@@ -161,7 +169,7 @@ def _generate_quant_pattern(input_pattern, qtype, scale: str, zp: str=None):
 
 
 def _get_qsdpa_qkv_pattern(
-    qtype, is_batch_size_1: bool, has_convert: bool, input_name: str
+    qtype, is_batch_size_1: bool, is_reduced_type: bool, has_convert: bool, input_name: str
 ):
     assert input_name in ["query", "key", "value"]
     qsdpa_qkv_pattern_before_dequant = CallFunction(
@@ -179,6 +187,7 @@ def _get_qsdpa_qkv_pattern(
     qsdpa_qkv_basic_pattern = _generate_dequant_pattern(
         qsdpa_qkv_pattern_before_dequant,
         qtype,
+        is_reduced_type,
         input_name[0] + "_scale",
         input_name[0] + "_zp" if qtype is torch.uint8 else None,
     )
@@ -216,10 +225,10 @@ def _get_qsdpa_score_pattern(
     qtype, has_mask: bool, is_batch_size_1: bool, is_reduced_type: bool, has_convert: bool, is_inv_scale: bool
 ):
     qsdpa_q_pattern = _get_qsdpa_qkv_pattern(
-        qtype, is_batch_size_1, has_convert, "query"
+        qtype, is_batch_size_1, is_reduced_type, has_convert, "query"
     )
     qsdpa_k_pattern = _get_qsdpa_qkv_pattern(
-        qtype, is_batch_size_1, has_convert, "key"
+        qtype, is_batch_size_1, is_reduced_type, has_convert, "key"
     )
     qsdpa_score_basic_pattern = CallFunction(
         aten.reshape.default,
@@ -335,6 +344,7 @@ def _get_qsdpa_attn_pattern(
             "a_zp" if qtype is torch.uint8 else None,
         ),
         qtype,
+        is_reduced_type,
         "a_scale",
         "a_zp" if qtype is torch.uint8 else None,
     )
@@ -358,6 +368,7 @@ def _get_qsdpa_attn_pattern(
                     "a_zp" if qtype is torch.uint8 else None,
                 ),
                 qtype,
+                is_reduced_type,
                 "a_scale",
                 "a_zp" if qtype is torch.uint8 else None,
             )
@@ -389,7 +400,7 @@ def _get_qsdpa_final_pattern(
     qtype, has_mask: bool, is_batch_size_1: bool, is_reduced_type: bool, has_convert: bool, is_inv_scale: bool
 ):
     qsdpa_v_pattern = _get_qsdpa_qkv_pattern(
-        qtype, is_batch_size_1, has_convert, "value"
+        qtype, is_batch_size_1, is_reduced_type, has_convert, "value"
     )
     qsdpa_attn_pattern = _get_qsdpa_attn_pattern(
         qtype, has_mask, is_batch_size_1, is_reduced_type, has_convert, is_inv_scale

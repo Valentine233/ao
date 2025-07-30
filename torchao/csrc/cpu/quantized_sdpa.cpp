@@ -1793,7 +1793,6 @@ fp8_sdpa_fused_kernel_impl(
     float v_scale,
     float a_scale,
     float o_scale) {
-  std::cout << "enter fp8_sdpa_fused_kernel_impl" << std::endl;
   // Query (Batch x Num_heads  x Q_seq_len  x Dim_per_head)
   //    -> (Batch x Q_seq_len  x Num_heads  x Dim_per_head)
   // Key   (Batch x Num_heads  x KV_seq_len x Dim_per_head)

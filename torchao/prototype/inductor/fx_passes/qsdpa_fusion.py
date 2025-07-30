@@ -53,7 +53,6 @@ def _register_qsdpa_pattern(pattern, custom_pass_dict):
         pattern, extra_check=_is_valid_qsdpa_pattern(), pass_dict=custom_pass_dict
     )
     def qsdpa(match: Match, *args, **kwargs):
-        print("hit qsdpa pattern")
         query = kwargs["query"]
         key = kwargs["key"]
         value = kwargs["value"]

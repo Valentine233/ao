@@ -97,7 +97,7 @@ def _register_qsdpa_pattern(pattern, custom_pass_dict):
             attn_mask,
             0.0,  # dropout
             False,  # is_causal
-            scale,  # scale
+            scale,
             q_scale,
             q_zp,
             k_scale,

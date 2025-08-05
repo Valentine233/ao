@@ -1775,7 +1775,7 @@ int8_sdpa_fused_kernel_impl(
   at::native::cpublas::brgemm_release();
 }
 
-// FP8 - one parallel loop with f8f8f8 GEMM 
+// FP8 - kernel with f8f8f8 GEMM
 template <typename scalar_t, typename mask_t,
           int64_t q_split_size, int64_t kv_split_size>
 inline typename std::enable_if_t<std::is_same_v<scalar_t, at::Float8_e4m3fn>, void>
@@ -2505,30 +2505,22 @@ at::Tensor _qscaled_dot_product_cpu(
       "_qscaled_dot_product_cpu: Don't accept zero point for Float8_e4m3");
   }
 
-  #ifdef CPU_CAPABILITY_AVX512
-    if (at::native::cpublas::could_pack(dtype)) {
-        at::Tensor output = at::empty_like(query, query.options()).transpose(1, 2);
-        if (dtype == at::ScalarType::Byte) {
+  if (dtype == at::ScalarType::Byte) {
+#ifdef CPU_CAPABILITY_AVX512
+      if (at::native::cpublas::could_pack(dtype)) {
+          at::Tensor output = at::empty_like(query, query.options()).transpose(1, 2);
+          std::cout << "int8_sdpa_fused_kernel" << std::endl;
           int8_sdpa_fused_kernel(output, query, key, value,
-            dropout_p, is_causal, attn_mask, scale,
-            q_scale, q_zp,
-            k_scale, k_zp,
-            v_scale, v_zp,
-            a_scale, a_zp,
-            o_scale, o_zp);
-        } else if (dtype == at::ScalarType::Float8_e4m3fn) {
-          fp8_sdpa_fused_kernel(output, query, key, value,
-            dropout_p, is_causal, attn_mask, scale,
-            q_scale, k_scale,
-            v_scale, a_scale,
-            o_scale);
-        } else {
-          TORCH_CHECK(false, "_qscaled_dot_product_cpu: Unsupported data type ", dtype);
-        }
-        return output.transpose(1, 2);
-    } else {
-  #endif // CPU_CAPABILITY_AVX512
-        if (dtype == at::ScalarType::Byte) {
+              dropout_p, is_causal, attn_mask, scale,
+              q_scale, q_zp,
+              k_scale, k_zp,
+              v_scale, v_zp,
+              a_scale, a_zp,
+              o_scale, o_zp);
+          return output.transpose(1, 2);
+      } else {
+#endif // CPU_CAPABILITY_AVX512
+          std::cout << "int8_sdpa_math_kernel" << std::endl;
           return int8_sdpa_math_kernel(query, key, value,
               dropout_p, is_causal, attn_mask, scale,
               q_scale, q_zp,
@@ -2536,17 +2528,35 @@ at::Tensor _qscaled_dot_product_cpu(
               v_scale, v_zp,
               a_scale, a_zp,
               o_scale, o_zp).transpose(1, 2).contiguous().transpose(1, 2);
-        } else if (dtype == at::ScalarType::Float8_e4m3fn) {
+#ifdef CPU_CAPABILITY_AVX512
+      }
+#endif // CPU_CAPABILITY_AVX512
+  } else if (dtype == at::ScalarType::Float8_e4m3fn) {
+#if defined(CPUBLAS_BRGEMM_F8F8F32) && defined(CPU_CAPABILITY_AVX512)
+// CPUBLAS_BRGEMM_F8F8F32 is defined if FP8 BRGEMM is supported in PyTorch CPUBlas.
+      if (at::native::cpublas::could_pack(dtype)) {
+          at::Tensor output = at::empty_like(query, query.options()).transpose(1, 2);
+          std::cout << "fp8_sdpa_fused_kernel" << std::endl;
+          fp8_sdpa_fused_kernel(output, query, key, value,
+              dropout_p, is_causal, attn_mask, scale,
+              q_scale, k_scale,
+              v_scale, a_scale,
+              o_scale);
+          return output.transpose(1, 2);
+      } else {
+#endif // CPU_CAPABILITY_AVX512 && CPUBLAS_BRGEMM_F8F8F32
+          std::cout << "fp8_sdpa_math_kernel" << std::endl;
           return fp8_sdpa_math_kernel(query, key, value,
               dropout_p, is_causal, attn_mask, scale,
               q_scale, k_scale,
               v_scale, a_scale,
               o_scale).transpose(1, 2).contiguous().transpose(1, 2);
-        }
-        TORCH_CHECK(false, "_qscaled_dot_product_cpu: Unsupported data type ", dtype);
-  #ifdef CPU_CAPABILITY_AVX512
-    }
-  #endif // CPU_CAPABILITY_AVX512
+#if defined(CPUBLAS_BRGEMM_F8F8F32) && defined(CPU_CAPABILITY_AVX512)
+      }
+#endif // CPU_CAPABILITY_AVX512 && CPUBLAS_BRGEMM_F8F8F32
+  } else {
+    TORCH_CHECK(false, "_qscaled_dot_product_cpu: Unsupported data type ", dtype);
+  }
 }
 
 

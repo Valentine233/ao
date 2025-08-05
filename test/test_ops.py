@@ -199,7 +199,7 @@ class TestOps(TestCase):
         "CPU" not in torch._C._dispatch_dump("torchao::qscaled_dot_product"),
         reason="cpp kernels not built",
     )
-    @parametrize("input_dtype", [orch.uint8, torch.float8_e4m3fn])
+    @parametrize("input_dtype", [torch.uint8, torch.float8_e4m3fn])
     @parametrize("batch_size", [56, 120])
     @parametrize("n_head", [2, 16])
     @parametrize("q_seq_len", [18, 89])
